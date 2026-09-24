@@ -1,0 +1,17 @@
+# Preprocessed features, checkpoints, logs and evaluation outputs (tens of GB).
+# The AI-Hub dataset and anything derived from it must not be uploaded (license: no redistribution).
+work*/
+dist/
+
+# logs
+setup.log
+*.log
+
+# model weights (large; produced by training)
+*.pt
+*.pth
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/

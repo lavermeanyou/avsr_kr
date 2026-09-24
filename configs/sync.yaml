@@ -1,0 +1,96 @@
+# avsr_kr - speaker-lip matching (audio-visual sync) model: standalone config (docs/SYNC_SPEC.md section 7).
+#   train:    & $py -m avsr.sync.train --config configs/sync.yaml
+#   evaluate: & $py -m avsr.sync.evaluate --ckpt work/checkpoints_sync/best.pt --split heldout
+# Override any key on the CLI:  --set train.epochs=1 --set sync.batch_size=32 --set sync.eval_windows=[25]
+work_dir: work
+seed: 1234
+
+split:
+  val_speakers: [C313]
+  test_speakers: [E014, C159]
+  train_split_dirs: [2.Validation, 1.Training]
+
+data:
+  angles: all
+  min_duration: 0.5
+  max_duration: 16.0
+  num_workers: 10
+
+# video / audio: identical to configs/base.yaml (the sync windows use the AVSR preprocessing and normalisation)
+video:
+  channels: 1
+  size: 96
+  crop: 88
+  fps_in: 30
+  fps_out: 25
+  # norm: 'utterance' = per-utterance z-score of the mouth crops (removes the ~2x brightness gap between the two
+  # recording setups of this dataset); 'global' = (x/255 - mean) / std with the constants below (measured on the data)
+  norm: utterance
+  cue_norm: utterance   # per-utterance z-score of the 8 geometry/colour cues ('none' = raw values)
+  mean: 0.4355
+  std: 0.1897
+  flip_prob: 0.5
+  time_mask_prob: 0.3
+  time_mask_max: 8
+
+audio:
+  sr: 16000
+  n_mels: 80
+  stack: 4
+  noise_prob: 0.6
+  noise_kinds: [babble, white, pink]
+  snr_min: -5
+  snr_max: 20
+  specaug: {freq_mask: 2, freq_width: 10, time_mask: 2, time_width: 10}
+
+train:
+  epochs: 30
+  lr: 3.0e-4
+  warmup_steps: 500
+  weight_decay: 0.01
+  grad_clip: 5.0
+  amp: bf16
+  # fraction of GPU memory PyTorch may cache (keeps the cache inside dedicated VRAM on Windows); 0 = no cap
+  cuda_mem_fraction: 0.8
+  ckpt_dir: work/checkpoints_sync
+  log_every: 50
+  eval_every_epoch: 1
+  keep_last: 3
+  resume: auto
+
+sync:
+  # ---- windows (25-fps frames; 25 = 1 s) and the shifted-audio hard negative
+  window_frames: 25
+  shift_min: 5
+  shift_max: 15
+  # ---- model (docs/SYNC_SPEC.md section 3)
+  hidden: 256
+  emb_dim: 256
+  temporal: conv        # conv = 4 dilated residual conv blocks (local receptive field) | gru = 2-layer BiGRU
+  use_cnn: true         # mouth-crop ResNet-18 branch
+  use_skeleton: true    # lip landmarks + cues branch
+  resnet: resnet18
+  dropout: 0.1
+  logit_scale_init: 10.0
+  logit_scale_max: 100.0
+  # ---- training audio augmentation: leakage of ONE other speaker (imperfect separation) + white/pink noise
+  leak_prob: 0.5
+  leak_snr_min: 5
+  leak_snr_max: 30
+  noise_prob: 0.3
+  noise_kinds: [white, pink]
+  noise_snr_min: 5
+  noise_snr_max: 30
+  specaug: {freq_mask: 1, freq_width: 8, time_mask: 1, time_width: 4}
+  # ---- optimisation
+  batch_size: 64
+  init_from: work/checkpoints/best.pt   # AVSR checkpoint whose frontends start the sync model ('' = from scratch)
+  val_max_utts: 600     # per-epoch validation (4-way selection + offset) on this evenly spread val subset
+  # ---- evaluation (avsr.sync.evaluate; docs/SYNC_SPEC.md section 6)
+  eval_windows: [13, 25, 50]
+  eval_n_way: [2, 3, 4]
+  eval_leak_db: [20, 10, 5]
+  eval_leak_n_way: [2, 4]
+  scene_k: [2, 3]
+  eval_scenes: 300
+  eval_max_utts: 600

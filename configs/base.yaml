@@ -1,0 +1,102 @@
+# avsr_kr - single source of hyper-parameters (docs/SPEC.md section 9).
+# Override any key on the CLI:  --set train.epochs=1 --set model.d_model=256 --set eval.snr_sweep=[20,0]
+work_dir: work
+seed: 1234
+
+split:
+  val_speakers: [C313]
+  test_speakers: [E014, C159]
+  train_split_dirs: [2.Validation, 1.Training]
+
+data:
+  angles: all
+  min_duration: 0.5
+  max_duration: 16.0
+  num_workers: 10
+
+video:
+  channels: 1
+  size: 96
+  crop: 88
+  fps_in: 30
+  fps_out: 25
+  # norm: 'utterance' = per-utterance z-score of the mouth crops (removes the ~2x brightness gap between the two
+  # recording setups of this dataset); 'global' = (x/255 - mean) / std with the constants below (measured on the data)
+  norm: utterance
+  cue_norm: utterance   # per-utterance z-score of the 8 geometry/colour cues ('none' = raw values)
+  mean: 0.4355
+  std: 0.1897
+  flip_prob: 0.5
+  time_mask_prob: 0.3
+  time_mask_max: 8
+
+audio:
+  sr: 16000
+  n_mels: 80
+  stack: 4
+  noise_prob: 0.6
+  noise_kinds: [babble, white, pink]
+  snr_min: -5
+  snr_max: 20
+  specaug: {freq_mask: 2, freq_width: 10, time_mask: 2, time_width: 10}
+
+# Encoder: 4-layer BiLSTM (320 units/direction). Trained from scratch on this ~10 h subset, a Conformer (d=256,
+# 12 blocks; with or without absolute positions, CTC-only or hybrid, 3e-4..1e-3 lr) never left the CTC blank plateau
+# within 3k steps, while the BiLSTM encoder learns at once (val CER 43 % after epoch 1, 36 % after epoch 2, audio only).
+# The Conformer remains available (encoder.type: conformer) for larger data / pretrained initialisation.
+# ctc_upsample 2: CTC runs at 50 Hz (jamo are ~14 tokens/s, i.e. ~0.55 per 25-fps frame otherwise).
+model:
+  d_model: 256
+  visual: {resnet: resnet18, out_dim: 512}
+  skeleton: {hidden: 256, out_dim: 256}
+  audio: {out_dim: 256}
+  fusion: {p_av: 0.5, p_audio_only: 0.25, p_video_only: 0.25}
+  pos_enc: none
+  ctc_upsample: 2
+  encoder: {type: blstm, rnn_layers: 4, rnn_hidden: 320, layers: 12, heads: 4, ffn: 2048, conv_kernel: 31, dropout: 0.1}
+  decoder: {layers: 6, heads: 4, ffn: 2048, dropout: 0.1}
+  ctc_weight: 0.7
+  snr_head_weight: 0.1
+  label_smoothing: 0.1
+
+train:
+  max_frames_per_batch: 3200
+  epochs: 30            # every epoch already shows each audio clip 5x (one per camera angle)
+  lr: 1.0e-3
+  warmup_steps: 1000
+  aug_start_epoch: 2    # epoch 1 on clean audio (learn the CTC alignment), noise mixing + SpecAugment from epoch 2
+  # modality-dropout curriculum (audio first, then vision), then model.fusion (0.5/0.25/0.25) from epoch 7.
+  # From scratch, lips-only samples from step 0 pull every output towards the text prior (input-independent
+  # hypotheses); the visual stream joins once the encoder already maps audio to text.
+  fusion_curriculum:
+    - {until_epoch: 3, p_av: 0.0, p_audio_only: 1.0, p_video_only: 0.0}
+    - {until_epoch: 6, p_av: 0.6, p_audio_only: 0.4, p_video_only: 0.0}
+  weight_decay: 0.01
+  grad_clip: 5.0
+  amp: bf16
+  # fraction of GPU memory PyTorch may cache. Peak use is ~8 GiB at max_frames_per_batch=3200; without a cap the cache
+  # fragments up to the full 16 GiB and Windows spills it into system RAM (training ~2.5x slower). 0 = no cap
+  cuda_mem_fraction: 0.8
+  ckpt_dir: work/checkpoints
+  log_every: 50
+  eval_every_epoch: 1
+  keep_last: 3
+  resume: auto
+
+eval:
+  decode: ctc_greedy
+  snr_sweep: [20, 10, 5, 0, -5]
+  noise_kind: babble
+  conditions: [av, audio, video]
+  max_val_utts: 400     # per-epoch validation decodes this evenly spread subset of the val split
+
+infer:
+  # compared against the ESTIMATED SNR (snr_estimator units, not true SNR): take the value evaluate.py prints as
+  # "in estimator units" after training (suggested_snr_threshold.infer_threshold in work/eval/<split>_results.json).
+  # 6.1 = calibrated on the validation speaker for work/checkpoints/best.pt (epoch 26): lips-only beats AV only below
+  # about -2..-5 dB true SNR (babble); above that the fused AV mode is best (lips already help inside AV mode).
+  snr_threshold: 6.1
+  snr_estimator: hybrid
+  segment_max_sec: 12.0
+  segment_min_sec: 1.0
+  chunk_pad_sec: 0.2

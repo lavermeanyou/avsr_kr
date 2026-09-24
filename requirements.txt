@@ -1,0 +1,24 @@
+# avsr_kr - Python 3.12 (64-bit, Windows 11). Exact versions the project was developed and tested with.
+#
+# PyTorch with CUDA 12.8 (RTX 50xx needs cu128 wheels) - install these three first:
+#   pip install torch==2.11.0 torchaudio==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+# then the rest:
+#   pip install -r requirements.txt
+#
+# Not installable with pip: ffmpeg/ffprobe (>= 6, on PATH) and assets/face_landmarker.task (MediaPipe model), see README.md.
+# scripts/setup.ps1 (1_setup.bat) does all of this on a fresh PC.
+torch==2.11.0
+torchaudio==2.11.0
+torchvision==0.26.0
+opencv-python==5.0.0.93
+mediapipe==1.0.1
+numpy==2.5.2
+soundfile==0.14.0
+scipy==1.18.1
+jiwer==4.0.0
+tqdm==4.70.1
+PyYAML==6.0.3
+pandas==3.0.6
+matplotlib==3.11.2
+# Visual C++ runtime DLLs for torch on this Windows image (without it: "WinError 126 ... c10.dll")
+msvc-runtime==14.44.35112; sys_platform == "win32"
