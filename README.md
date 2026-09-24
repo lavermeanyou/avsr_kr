@@ -696,13 +696,15 @@ E014는 녹음 SNR이 매우 높고(약 38 dB, 다른 화자 11~14 dB) 말이 �
 
 ### 12.2 준비 (PC마다 처음 한 번)
 
-1. **메인 PC**에서 코드를 묶습니다. 탐색기에서 `avsr_kr\scripts\make_dist.ps1`을 오른쪽 클릭 → "PowerShell에서 실행"
-   (Windows 11에서는 "추가 옵션 표시" 안에 있음. 또는 PowerShell 창에서 `.\scripts\make_dist.ps1`). `dist\avsr_kr_code.zip`이 생깁니다(약 3.5 MB, 파일 약 70개 — 코드,
-   설정, MediaPipe 모델, 테스트, 문서. 데이터·체크포인트·`work` 폴더는 들어가지 않음).
-2. zip을 USB 등으로 다른 PC에 옮겨 압축을 풀고(오른쪽 클릭 → 모두 압축 풀기), 안의 `avsr_kr` 폴더를 둘 곳에 둡니다.
-   **경로에 한글이 없는 곳**을 권장합니다(예: `C:\avsr_kr`). MediaPipe(얼굴 랜드마크)가 한글 경로의 모델 파일을 열지
-   못하기 때문입니다. `2_preprocess_part.bat`는 이 문제를 스스로 피해 가지만(모델 파일 사본을 `C:\ProgramData\avsr_kr`에
-   두고 사용), 추론 등 다른 명령은 영향을 받습니다(12.6).
+1. **코드 받기 (GitHub, 권장):** 다른 PC의 브라우저에서 GitHub에 로그인하고 비공개 저장소
+   `https://github.com/lavermeanyou/avsr_kr` → 초록색 **Code** 버튼 → **Download ZIP**. 압축을 풀면(오른쪽 클릭 → 모두 압축
+   풀기) 나오는 `avsr_kr-main` 폴더를 둘 곳에 둡니다(이름을 `avsr_kr`로 바꿔도 됩니다). 다른 PC에 Git을 설치할 필요는
+   없습니다. 코드가 바뀌면 같은 방법으로 다시 받아 덮어쓰면 됩니다(`work` 폴더는 GitHub에 없으므로 덮어써지지 않음).
+   GitHub에는 코드·설정·MediaPipe 모델·테스트·문서만 있고(약 4.5 MB), 데이터·전처리 결과·체크포인트·`work` 폴더는
+   올리지 않습니다(용량이 크고, AI-Hub 데이터는 재배포 금지).
+   - 메인 PC에서 코드를 고친 뒤 올리기: `git add -A; git commit -m "변경 내용"; git push` (Git은 사용자 폴더에 설치되어 있음).
+   - GitHub를 쓸 수 없을 때: 메인 PC에서 `.\scripts\make_dist.ps1`로 `dist\avsr_kr_code.zip`을 만들어 USB로 옮겨도 같습니다.
+2. 폴더 위치는 자유입니다. 한글이 들어간 경로도 됩니다(MediaPipe 모델을 바이트로 읽도록 고쳐서 한글 경로 문제가 없음).
 3. `avsr_kr` 폴더의 **`1_setup.bat`를 더블클릭** → Enter.
    Python 3.12(winget, 사용자 설치), FFmpeg(winget `Gyan.FFmpeg`), 파이썬 패키지(`requirements.txt`, torch는 CUDA 12.8판,
    처음에는 약 4 GB 다운로드), `msvc-runtime`(없으면 torch가 `WinError 126 ... c10.dll` 오류), MediaPipe 모델 파일을 확인해
@@ -801,11 +803,9 @@ PC 2~4가 끝나면 USB를 메인 PC에 꽂고(또는 공유 폴더를 쓰고) *
 - **PowerShell에서 경로 뒤에 `\`를 붙였더니 이상하게 동작해요.** Windows PowerShell 5.1은 `"D:\my dir\"`처럼 따옴표 안의
   경로가 `\`로 끝나면 뒤의 인자까지 경로에 붙여 버립니다. `.bat` 파일은 이를 자동으로 처리하고, `preprocess_shard.ps1`과
   `merge_shards.ps1`은 이런 경로를 발견하면 오류로 알려 줍니다. 끝의 `\`를 빼세요(드라이브 루트는 따옴표 없이 `E:\`).
-- **`avsr_kr`를 한글이 들어간 폴더에 두었더니 `Unable to open file ... face_landmarker.task` 오류가 나요.** MediaPipe가
-  한글 경로의 파일을 열지 못합니다. `2_preprocess_part.bat`(`preprocess_shard.ps1`)는 자동으로 우회합니다. 직접 명령을 쓸
-  때는 `--model C:\ProgramData\avsr_kr\face_landmarker.task`(전처리) 또는 `--landmarker C:\ProgramData\avsr_kr\face_landmarker.task`
-  (추론)를 주거나(사본은 `1_setup.bat`가 만들어 둠), `avsr_kr` 폴더를 `C:\avsr_kr`처럼 영문 경로로 옮기세요. 학습·평가는
-  영향을 받지 않습니다.
+- **`avsr_kr`를 한글이 들어간 폴더에 두었더니 `Unable to open file ... face_landmarker.task` 오류가 나요.** 예전 코드의
+  문제입니다(MediaPipe가 한글 경로의 파일 이름을 열지 못함). 지금 코드는 모델을 바이트로 읽어서 한글 경로에서도 됩니다.
+  이 오류가 나면 GitHub에서 최신 코드를 다시 받으세요.
 - **USB를 뽑았거나 네트워크가 끊겼어요.** 같은 것을 다시 실행하면 이어서 복사합니다. 전송 폴더의 드라이브나 공유
   폴더가 없으면(USB를 아직 꽂지 않음 등) `2_preprocess_part.bat`는 전처리를 시작하기 전에 `transfer folder not reachable`
   오류로 알려 줍니다. USB를 꽂고 다시 실행하거나, 전송 폴더를 비워 두세요.
