@@ -1,8 +1,9 @@
-# Normalise text files in the repository; Windows script files are always checked out with CRLF line endings
-# (cmd.exe misparses .bat files with LF endings).
+# Normalise text files in the repository. Batch files are stored byte-for-byte with their CRLF line endings
+# (no conversion at all), so they stay valid in every download path, including GitHub's "Download ZIP"
+# (cmd.exe misparses .bat files with LF endings, e.g. goto labels).
 * text=auto
-*.bat text eol=crlf
-*.cmd text eol=crlf
+*.bat -text
+*.cmd -text
 *.ps1 text eol=crlf
 
 # binary assets
