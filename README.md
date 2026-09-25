@@ -17,6 +17,12 @@
 
 상세 설계 계약서는 [`docs/SPEC.md`](docs/SPEC.md)에 있습니다.
 
+**데이터와 포함된 파일**
+- 이 저장소에는 **데이터가 들어 있지 않습니다.** AI-Hub 「립리딩(입모양) 음성인식 데이터」는 AI-Hub(https://aihub.or.kr)에서
+  직접 이용 신청해 받아야 하며, 원본·가공 데이터 모두 재배포할 수 없습니다. 전처리 결과·학습된 모델(`work/`)도 올리지 않습니다.
+- `assets/face_landmarker.task`: Google MediaPipe Face Landmarker 모델(Apache License 2.0),
+  배포 주소 `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`.
+
 ---
 
 ## 1. 폴더 구조

@@ -28,8 +28,9 @@ PAD = Tokenizer.pad_id
 HAS_CUDA = torch.cuda.is_available()
 CUDA = torch.device("cuda") if HAS_CUDA else None
 CPU = torch.device("cpu")
-# ~5 s of speech (29 syllables -> 80 jamo/space/punct tokens): the realistic CTC-feasibility case.
-LONG_SENTENCE = "최근에 저희 팀장님께서, 시간을 돌리면 어떤 걸 하고 싶냐고 물었어요."
+# ~5 s of speech (29 syllables -> 83 jamo/space/punct tokens): the realistic CTC-feasibility case.
+# (an invented sentence: no dataset transcript is included in the repository)
+LONG_SENTENCE = "지난 주말에 가족과 함께, 바닷가 근처 식당에서 저녁을 먹고 산책했어요."
 
 
 def make_cfg(small: bool = True) -> dict[str, Any]:
@@ -262,25 +263,26 @@ def test_loss_backward_cpu() -> None:
 
 
 def test_ctc_realistic_length() -> None:
-    """T = 125 frames (5 s at 25 fps) with L = 80 jamo tokens: CTC must be feasible, i.e. finite without
+    """T = 125 frames (5 s at 25 fps) with L = 83 jamo tokens: CTC must be feasible, i.e. finite without
     zero_infinity (which would otherwise silently zero the loss)."""
     tok = Tokenizer()
     ids = tok.encode(LONG_SENTENCE)
-    assert len(ids) == 80, len(ids)
+    n = len(ids)
+    assert n == 83, n
     repeats = sum(int(a == b) for a, b in zip(ids, ids[1:]))
-    assert 125 >= len(ids) + repeats
+    assert 125 >= n + repeats
     torch.manual_seed(0)
     cfg = make_cfg()
     model = build_model(cfg, VOCAB).train()
-    batch = make_batch([125, 110], [80, 60], CPU)
-    batch["tokens"][0, :80] = torch.tensor(ids)
+    batch = make_batch([125, 110], [n, 60], CPU)
+    batch["tokens"][0, :n] = torch.tensor(ids)
     out = model(batch, mode="av")
     loss, parts = model.compute_loss(out, batch, cfg)
     raw = F.ctc_loss(out["ctc_logits"].float().log_softmax(-1).transpose(0, 1), batch["tokens"], out["enc_lengths"],
                      batch["token_lengths"], blank=0, reduction="none", zero_infinity=False).detach()
     assert bool(torch.isfinite(raw).all()) and bool((raw > 0).all()), raw
     assert parts["ctc"] > 0 and torch.isfinite(loss)
-    print(f"  ctc feasibility: T=125 L=80 repeats={repeats} -> per-utt ctc {[round(float(r), 1) for r in raw]}")
+    print(f"  ctc feasibility: T=125 L={n} repeats={repeats} -> per-utt ctc {[round(float(r), 1) for r in raw]}")
 
 
 def test_decode_cpu() -> None:
